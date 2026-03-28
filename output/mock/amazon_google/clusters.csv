@@ -1,0 +1,8 @@
+cluster_id,entity_id,source
+0,amazon_001,amazon
+0,google_001,google
+1,amazon_002,amazon
+1,google_002,google
+2,amazon_003,amazon
+2,google_003,google
+3,google_004,google

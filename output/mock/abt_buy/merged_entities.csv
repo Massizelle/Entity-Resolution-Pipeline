@@ -1,0 +1,9 @@
+cluster_id,attribute_name,merged_value
+0,name,dell inspiron 15 laptop
+0,price,499.99
+1,name,hp pavilion 15
+1,price,549.00
+2,name,samsung galaxy tab s7
+2,price,649.99
+3,name,lenovo ideapad 3
+3,price,379.00

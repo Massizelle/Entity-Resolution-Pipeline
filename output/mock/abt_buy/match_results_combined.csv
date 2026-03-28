@@ -1,0 +1,7 @@
+id_A,id_B,similarity_score,is_match
+abt_001,buy_001,0.86,1
+abt_001,buy_002,0.21000000000000002,0
+abt_002,buy_001,0.16,0
+abt_002,buy_002,0.73,1
+abt_003,buy_003,0.91,1
+abt_003,buy_004,0.13,0
