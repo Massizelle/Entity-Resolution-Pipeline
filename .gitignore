@@ -1,0 +1,11 @@
+# Generated pipeline outputs (often large; regenerate with run_member1 / run_member2)
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+.env
