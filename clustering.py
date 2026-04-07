@@ -1,45 +1,35 @@
 import pandas as pd
 import networkx as nx
 import os
+import numpy as np
 
 def build_connected_components(df_matches):
-    """Groups all connected nodes into clusters."""
     G = nx.Graph()
     for index, row in df_matches.iterrows():
         G.add_edge(row['id_A'], row['id_B'], weight=row['similarity_score'])
-
     clusters = list(nx.connected_components(G))
     return _format_clusters(clusters)
 
 def build_center_clustering(df_matches):
-    """Groups nodes by picking a highly-connected center and its direct neighbors."""
     G = nx.Graph()
     for index, row in df_matches.iterrows():
         G.add_edge(row['id_A'], row['id_B'], weight=row['similarity_score'])
-
     clusters = []
-    H = G.copy() # Work on a copy so we can remove nodes as we cluster them
-
+    H = G.copy()
+    
     while H.edges():
-        # 1. Find the node with the highest degree (most connections)
         degrees = dict(H.degree())
         center_node = max(degrees, key=degrees.get)
-
-        # 2. Get the center and its direct neighbors
         cluster_nodes = [center_node] + list(H.neighbors(center_node))
         clusters.append(cluster_nodes)
-
-        # 3. Remove these nodes from the graph so they aren't clustered twice
         H.remove_nodes_from(cluster_nodes)
-
-    # 4. Any remaining isolated nodes get their own individual cluster
+        
     for node in list(H.nodes()):
         clusters.append([node])
-
+        
     return _format_clusters(clusters)
 
 def _format_clusters(clusters):
-    """Helper function to format the output DataFrame."""
     cluster_records = []
     for cluster_id, node_set in enumerate(clusters):
         for node in node_set:
@@ -49,23 +39,51 @@ def _format_clusters(clusters):
             })
     return pd.DataFrame(cluster_records)
 
-# --- Let's test both methods ---
-file_path = "output/mock/amazon_google/match_results_jaccard.csv"
+def merge_cluster_attributes(df_clusters, source1_path, source2_path):
+    df1 = pd.read_csv(source1_path)
+    df2 = pd.read_csv(source2_path)
+    df_all_data = pd.concat([df1, df2], ignore_index=True)
+    df_merged = df_clusters.merge(df_all_data, left_on='entity_id', right_on='id', how='left')
+    canonical_records = []
+    
+    for cluster_id, group in df_merged.groupby('cluster_id'):
+        
+        def get_longest_string(col_name):
+            valid_strings = group[col_name].dropna().astype(str)
+            if valid_strings.empty: return ""
+            return max(valid_strings, key=len)
+            
+        def get_best_price():
+            valid_prices = group['price'].replace(0.0, np.nan).dropna()
+            if valid_prices.empty: return 0.0
+            return valid_prices.iloc[0] 
+            
+        record = {
+            'cluster_id': cluster_id,
+            'title': get_longest_string('title'),
+            'description': get_longest_string('description'),
+            'manufacturer': get_longest_string('manufacturer'),
+            'price': get_best_price()
+        }
+        canonical_records.append(record)
+        
+    return pd.DataFrame(canonical_records)
 
-if os.path.exists(file_path):
-    # Load the data once and filter for matches
+file_path = "output/mock/amazon_google/match_results_jaccard.csv"
+source1 = "data/cleaned/amazon_google/cleaned_source1.csv"
+source2 = "data/cleaned/amazon_google/cleaned_source2.csv"
+
+if os.path.exists(file_path) and os.path.exists(source1):
     df = pd.read_csv(file_path)
     df_matches = df[df['is_match'] == 1]
     
-    print("\n--- 1. Connected Components Output ---")
-    df_cc = build_connected_components(df_matches)
-    print(df_cc)
-
-    print("\n--- 2. Center Clustering Output ---")
-    df_center = build_center_clustering(df_matches)
-    print(df_center)
+    df_clusters = build_center_clustering(df_matches)
+    df_final_entities = merge_cluster_attributes(df_clusters, source1, source2)
     
-    # Uncomment below to save your final choice! 
-    # df_cc.to_csv("output/mock/amazon_google/clusters.csv", index=False)
+    print(df_final_entities.head())
+    
+    df_clusters.to_csv("output/mock/amazon_google/clusters.csv", index=False)
+    df_final_entities.to_csv("output/mock/amazon_google/merged_entities.csv", index=False)
+    print("\n✅ SUCCESS! clusters.csv and merged_entities.csv have been saved.")
 else:
-    print(f"❌ Could not find {file_path}.")
+    print("❌ Could not find the required files.")
