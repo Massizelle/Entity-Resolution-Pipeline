@@ -382,6 +382,6 @@ Les prochaines étapes naturelles sont:
 
 ## Documentation complémentaire
 
-- [README_block_processing.md](/home/noureddine/paris_cite/Big%20Data/Entity-Resolution-Pipeline/README_block_processing.md)
-- [README_matching.md](/home/noureddine/paris_cite/Big%20Data/Entity-Resolution-Pipeline/README_matching.md)
-- [README_pipeline_modes.md](/home/noureddine/paris_cite/Big%20Data/Entity-Resolution-Pipeline/README_pipeline_modes.md)
+- [README_block_processing.md](https://github.com/Massizelle/Entity-Resolution-Pipeline/blob/pipeline-orchestration/README_block_processing.md)
+- [README_matching.md](https://github.com/Massizelle/Entity-Resolution-Pipeline/blob/pipeline-orchestration/README_matching.md)
+- [README_pipeline_modes.md](https://github.com/Massizelle/Entity-Resolution-Pipeline/blob/pipeline-orchestration/README_pipeline_modes.md)
