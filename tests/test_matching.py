@@ -8,7 +8,7 @@ import tempfile
 import pandas as pd
 import pytest
 
-from matching import (
+from pipeline.matching import (
     jaccard_sim,
     tfidf_sim,
     sbert_sim,
@@ -18,7 +18,9 @@ from matching import (
     combine_scores,
     evaluate,
     load_and_prepare,
+    _load_candidate_pairs,
 )
+from pipeline.adaptive_rescue import profile_matching_surface
 
 
 # ─── ÉTAPE 1 — load_and_prepare ───────────────────────────────────────────────
@@ -182,6 +184,95 @@ def test_combine_scores_is_match_is_int():
     assert result["is_match"].iloc[0] in [0, 1]
 
 
+def test_combine_scores_does_not_lower_strong_value_match():
+    value_df = pd.DataFrame({
+        "id_A": ["a1", "a1", "a2"],
+        "id_B": ["b1", "b2", "b3"],
+        "certificate_score": [4.0, 0.2, 0.1],
+        "jaccard_score": [0.9, 0.2, 0.1],
+        "tfidf_score": [0.9, 0.2, 0.1],
+        "sbert_score": [0.9, 0.2, 0.1],
+        "value_score": [0.9, 0.2, 0.1],
+        "is_match": [1, 0, 0],
+    })
+    result = combine_scores(value_df, pd.DataFrame())
+    row = result[result["id_B"] == "b1"].iloc[0]
+    assert row["final_score"] >= 0.9
+    assert row["is_match"] == 1
+
+
+def test_combine_scores_uses_mutual_best_and_certificate_support():
+    value_df = pd.DataFrame({
+        "id_A": ["a1", "a1", "a2"],
+        "id_B": ["b1", "b2", "b2"],
+        "certificate_score": [3.0, 0.1, 0.1],
+        "jaccard_score": [0.48, 0.47, 0.30],
+        "tfidf_score": [0.48, 0.47, 0.30],
+        "sbert_score": [0.48, 0.47, 0.30],
+        "value_score": [0.48, 0.47, 0.30],
+        "is_match": [0, 0, 0],
+    })
+    result = combine_scores(value_df, pd.DataFrame())
+    best = result[result["id_B"] == "b1"].iloc[0]
+    assert best["mutual_best_bonus"] == pytest.approx(1.0)
+    assert best["final_score"] > best["value_score"]
+
+
+def test_profile_matching_surface_activates_on_ambiguous_surface():
+    df = pd.DataFrame({
+        "id_A": [f"a{i}" for i in range(10)],
+        "id_B": [f"b{i}" for i in range(10)],
+        "value_score": [0.41, 0.43, 0.47, 0.44, 0.49, 0.38, 0.40, 0.46, 0.52, 0.30],
+        "final_score": [0.45, 0.48, 0.51, 0.49, 0.54, 0.42, 0.44, 0.53, 0.60, 0.20],
+        "is_match": [0] * 10,
+    })
+    profile = profile_matching_surface(df)
+    assert profile["activate"] is True
+
+
+def test_profile_matching_surface_stays_off_on_cleanly_separated_surface():
+    df = pd.DataFrame({
+        "id_A": [f"a{i}" for i in range(6)],
+        "id_B": [f"b{i}" for i in range(6)],
+        "value_score": [0.95, 0.92, 0.88, 0.05, 0.08, 0.10],
+        "final_score": [0.99, 0.97, 0.94, 0.06, 0.08, 0.10],
+        "is_match": [1, 1, 1, 0, 0, 0],
+    })
+    profile = profile_matching_surface(df)
+    assert profile["activate"] is False
+
+
+def test_combine_scores_adds_adaptive_bonus_on_ambiguous_supported_pair():
+    value_df = pd.DataFrame({
+        "id_A": ["a1", "a1", "a2", "a2", "a3", "a3"],
+        "id_B": ["b1", "b2", "b1", "b2", "b3", "b4"],
+        "certificate_score": [0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+        "evidence_count": [4, 1, 4, 1, 1, 1],
+        "witness_path": [
+            "rare_pair:x|digit_signature:123|token_skeleton:abc",
+            "block_id:z",
+            "rare_pair:x|digit_signature:123|token_skeleton:abc",
+            "block_id:z",
+            "block_id:q",
+            "block_id:r",
+        ],
+        "region_size": [2, 20, 2, 20, 25, 25],
+        "jaccard_score": [0.39, 0.37, 0.44, 0.25, 0.36, 0.35],
+        "tfidf_score": [0.40, 0.37, 0.46, 0.25, 0.38, 0.36],
+        "sbert_score": [0.41, 0.37, 0.47, 0.25, 0.41, 0.38],
+        "value_score": [0.40, 0.37, 0.456667, 0.25, 0.383333, 0.363333],
+        "is_match": [0, 0, 0, 0, 0, 0],
+    })
+    result = combine_scores(value_df, pd.DataFrame())
+    rescued = result[(result["id_A"] == "a1") & (result["id_B"] == "b1")].iloc[0]
+    weak = result[(result["id_A"] == "a1") & (result["id_B"] == "b2")].iloc[0]
+
+    assert bool(rescued["adaptive_rescue_active"]) is True
+    assert rescued["adaptive_rescue_bonus"] > 0.0
+    assert weak["adaptive_rescue_bonus"] == pytest.approx(0.0)
+
+
+
 # ─── ÉTAPE 6 — evaluate ───────────────────────────────────────────────────────
 
 def test_evaluate_returns_none_if_no_ground_truth():
@@ -208,6 +299,24 @@ def test_evaluate_perfect_match():
         os.unlink(path)
 
 
+def test_evaluate_casts_ground_truth_ids_to_strings():
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
+        f.write("id_A,id_B\n1,2\n")
+        path = f.name
+    try:
+        matches_df = pd.DataFrame({
+            "id_A": ["1"],
+            "id_B": ["2"],
+            "is_match": [1],
+        })
+        precision, recall, f1 = evaluate(matches_df, path)
+        assert precision == pytest.approx(1.0)
+        assert recall == pytest.approx(1.0)
+        assert f1 == pytest.approx(1.0)
+    finally:
+        os.unlink(path)
+
+
 def test_evaluate_no_match():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
         f.write("id_A,id_B\na1,b1\n")
@@ -222,5 +331,39 @@ def test_evaluate_no_match():
         assert precision == pytest.approx(0.0)
         assert recall == pytest.approx(0.0)
         assert f1 == pytest.approx(0.0)
+    finally:
+        os.unlink(path)
+
+
+def test_evaluate_uses_only_rows_marked_as_match():
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
+        f.write("id_A,id_B\na1,b1\n")
+        path = f.name
+    try:
+        matches_df = pd.DataFrame(
+            {
+                "id_A": ["a1", "a2"],
+                "id_B": ["b1", "b2"],
+                "is_match": [1, 0],
+            }
+        )
+        precision, recall, f1 = evaluate(matches_df, path)
+        assert precision == pytest.approx(1.0)
+        assert recall == pytest.approx(1.0)
+        assert f1 == pytest.approx(1.0)
+    finally:
+        os.unlink(path)
+
+
+def test_load_candidate_pairs_sorts_by_certificate_score_for_cw_semantic_predictive():
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
+        f.write("id_A,id_B,certificate_score\n")
+        f.write("a1,b1,2.1\n")
+        f.write("a2,b2,3.9\n")
+        f.write("a3,b3,3.5\n")
+        path = f.name
+    try:
+        df = _load_candidate_pairs(path, candidate_strategy="cw_semantic_predictive", limit=2)
+        assert list(df["id_A"]) == ["a2", "a3"]
     finally:
         os.unlink(path)

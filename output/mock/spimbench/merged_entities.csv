@@ -1,9 +1,4 @@
-cluster_id,attribute_name,merged_value
-0,label,stanley kubrick
-0,birthdate,1928 07 26
-1,label,city of london
-1,country,united kingdom
-2,label,formula one world championship
-2,sport,formula 1
-3,label,arsenal fc
-3,sport,football
+cluster_id,label,description
+0,kubrick stanley,american film director producer screenwriter
+1,city of london,historic city square mile financial district england
+2,formula one world championship,fia formula one season grand prix racing world title

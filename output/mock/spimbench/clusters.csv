@@ -1,8 +1,7 @@
 cluster_id,entity_id,source
-0,spim_a_001,spimbench_a
 0,spim_b_001,spimbench_b
-1,spim_a_002,spimbench_a
+0,spim_a_001,spimbench_a
 1,spim_b_003,spimbench_b
+1,spim_a_002,spimbench_a
 2,spim_a_003,spimbench_a
 2,spim_b_004,spimbench_b
-3,spim_b_002,spimbench_b

@@ -1,7 +1,6 @@
 id_A,id_B,similarity_score,is_match
-spim_a_001,spim_b_001,0.88,1
-spim_a_001,spim_b_002,0.22,0
-spim_a_002,spim_b_003,0.86,1
-spim_a_002,spim_b_004,0.17,0
-spim_a_003,spim_b_004,0.79,1
-spim_a_003,spim_b_001,0.13,0
+spim_a_001,spim_b_001,0.3333333333333333,0
+spim_a_001,spim_b_002,0.2142857142857142,0
+spim_a_002,spim_b_003,0.5,1
+spim_a_003,spim_b_001,0.0,0
+spim_a_003,spim_b_004,0.375,1

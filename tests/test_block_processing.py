@@ -8,7 +8,7 @@ import tempfile
 import pandas as pd
 import pytest
 
-from block_processing import (
+from pipeline.block_processing import (
     load_blocks_csv,
     meta_blocking_candidate_pairs,
     purge_oversized_blocks,
@@ -97,3 +97,48 @@ def test_run_block_processing_writes_csv():
         assert len(result) == 1
         assert stats["candidate_pairs"] == 1
         assert stats["cartesian_pairs"] == 1
+
+
+def test_run_block_processing_cw_semantic_predictive_writes_csv(tmp_path):
+    df = pd.DataFrame(
+        [
+            {"block_id": "z1", "entity_id": "a1", "source": "s1"},
+            {"block_id": "z1", "entity_id": "b1", "source": "s2"},
+            {"block_id": "z2", "entity_id": "a2", "source": "s1"},
+            {"block_id": "z2", "entity_id": "b2", "source": "s2"},
+        ]
+    )
+    blocks = tmp_path / "blocks.csv"
+    out_csv = tmp_path / "candidate_pairs.csv"
+    s1_path = tmp_path / "cleaned_source1.csv"
+    s2_path = tmp_path / "cleaned_source2.csv"
+    df.to_csv(blocks, index=False)
+
+    pd.DataFrame(
+        [
+            {"id": "a1", "title": "Dell Inspiron 15 laptop"},
+            {"id": "a2", "title": "Canon Pixma MP500 all in one printer"},
+        ]
+    ).to_csv(s1_path, index=False)
+    pd.DataFrame(
+        [
+            {"id": "b1", "name": "Dell Inspiron 15 notebook"},
+            {"id": "b2", "name": "Canon Pixma MP-500 all-in-one printer"},
+        ]
+    ).to_csv(s2_path, index=False)
+
+    result, stats = run_block_processing(
+        str(blocks),
+        str(out_csv),
+        "s1",
+        "s2",
+        candidate_strategy="cw_semantic_predictive",
+        source1_cleaned_path=str(s1_path),
+        source2_cleaned_path=str(s2_path),
+        verbose=False,
+    )
+
+    assert os.path.isfile(out_csv)
+    assert not result.empty
+    assert "certificate_score" in result.columns
+    assert stats["candidate_strategy"] == "cw_semantic_predictive"

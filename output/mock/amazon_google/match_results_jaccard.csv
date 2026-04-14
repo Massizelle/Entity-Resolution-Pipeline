@@ -1,7 +1,7 @@
 id_A,id_B,similarity_score,is_match
-amazon_001,google_001,0.82,1
-amazon_001,google_002,0.18,0
-amazon_002,google_001,0.14,0
-amazon_002,google_002,0.75,1
-amazon_003,google_003,0.91,1
-amazon_003,google_004,0.1,0
+amazon_001,google_001,0.625,1
+amazon_001,google_002,0.3333333333333333,1
+amazon_002,google_001,0.15,0
+amazon_002,google_002,0.1666666666666666,0
+amazon_003,google_003,0.6153846153846154,1
+amazon_003,google_004,0.1176470588235294,0
