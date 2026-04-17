@@ -452,10 +452,13 @@ def _print_evaluation_block(all_metrics: dict[str, dict], elapsed: float) -> Non
         if "error" in m:
             print(f"  {YELLOW('Évaluation indisponible — ' + m['error'])}")
         elif "precision" in m:
+            p_str = f"{m['precision']:.4f}"
+            r_str = f"{m['recall']:.4f}"
+            f_str = f"{m['f1']:.4f}"
             print(f"\n  {BOLD('Métriques (ground truth) :')}")
-            print(f"    {'Précision':<22} {GREEN(f\"{m['precision']:.4f}\")}")
-            print(f"    {'Rappel':<22} {GREEN(f\"{m['recall']:.4f}\")}")
-            print(f"    {'F1-score':<22} {GREEN(f\"{m['f1']:.4f}\")}")
+            print(f"    {'Précision':<22} " + GREEN(p_str))
+            print(f"    {'Rappel':<22} " + GREEN(r_str))
+            print(f"    {'F1-score':<22} " + GREEN(f_str))
         else:
             print(f"  {DIM('Pas de ground truth disponible (ex: spimbench).')}")
 
@@ -469,7 +472,7 @@ def _print_evaluation_block(all_metrics: dict[str, dict], elapsed: float) -> Non
     minutes = int(elapsed // 60)
     seconds = elapsed % 60
     time_str = f"{minutes}m {seconds:.1f}s" if minutes > 0 else f"{seconds:.1f}s"
-    print(f"\n  {BOLD('Temps d\\'exécution total :')} {GREEN(time_str)}")
+    print("\n  " + BOLD("Temps d'exécution total :") + " " + GREEN(time_str))
     print(f"{BOLD('═' * (W + 2))}\n")
 
 
