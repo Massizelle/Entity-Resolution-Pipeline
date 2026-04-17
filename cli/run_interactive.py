@@ -18,6 +18,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -396,6 +397,82 @@ def _show_status() -> None:
     print()
 
 
+def _extract_dataset_from_command(command: list[str]) -> str | None:
+    """Return the --dataset value from a built command, or None (means 'all')."""
+    try:
+        idx = command.index("--dataset")
+        return command[idx + 1]
+    except (ValueError, IndexError):
+        return None
+
+
+def _compute_evaluation(dataset: str, use_mock: bool) -> dict:
+    """Load match results + ground truth for one dataset and return metrics."""
+    try:
+        import pandas as pd
+        from pipeline.matching import evaluate
+
+        root = os.path.join("output", "mock") if use_mock else "output"
+        match_path = os.path.join(root, dataset, "match_results_collective.csv")
+        gt_path    = os.path.join("data", "cleaned", dataset, "ground_truth.csv")
+        clusters_path = os.path.join(root, dataset, "clusters.csv")
+        merged_path   = os.path.join(root, dataset, "merged_entities.csv")
+
+        metrics: dict = {}
+
+        if os.path.isfile(clusters_path):
+            df_c = pd.read_csv(clusters_path)
+            metrics["n_clusters"] = int(df_c["cluster_id"].nunique()) if "cluster_id" in df_c.columns else 0
+        if os.path.isfile(merged_path):
+            metrics["n_merged"] = len(pd.read_csv(merged_path))
+
+        if os.path.isfile(match_path) and os.path.isfile(gt_path):
+            matches_df = pd.read_csv(match_path, dtype={"id_A": str, "id_B": str})
+            result = evaluate(matches_df, gt_path)
+            if result:
+                metrics["precision"], metrics["recall"], metrics["f1"] = result
+
+        return metrics
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+def _print_evaluation_block(all_metrics: dict[str, dict], elapsed: float) -> None:
+    """Print a structured final evaluation block."""
+    W = 54
+    print(f"\n{BOLD('╔' + '═' * W + '╗')}")
+    title = "RÉSULTATS FINAUX — PIPELINE ER"
+    pad   = (W - len(title)) // 2
+    print(f"{BOLD('║' + ' ' * pad + title + ' ' * (W - pad - len(title)) + '║')}")
+    print(f"{BOLD('╚' + '═' * W + '╝')}")
+
+    for dataset, m in all_metrics.items():
+        print(f"\n  {BOLD('Dataset :')} {GREEN(dataset)}")
+
+        if "error" in m:
+            print(f"  {YELLOW('Évaluation indisponible — ' + m['error'])}")
+        elif "precision" in m:
+            print(f"\n  {BOLD('Métriques (ground truth) :')}")
+            print(f"    {'Précision':<22} {GREEN(f\"{m['precision']:.4f}\")}")
+            print(f"    {'Rappel':<22} {GREEN(f\"{m['recall']:.4f}\")}")
+            print(f"    {'F1-score':<22} {GREEN(f\"{m['f1']:.4f}\")}")
+        else:
+            print(f"  {DIM('Pas de ground truth disponible (ex: spimbench).')}")
+
+        if "n_clusters" in m or "n_merged" in m:
+            print(f"\n  {BOLD('Clustering :')}")
+            if "n_clusters" in m:
+                print(f"    {'Clusters':<22} {m['n_clusters']:,}")
+            if "n_merged" in m:
+                print(f"    {'Entités fusionnées':<22} {m['n_merged']:,}")
+
+    minutes = int(elapsed // 60)
+    seconds = elapsed % 60
+    time_str = f"{minutes}m {seconds:.1f}s" if minutes > 0 else f"{seconds:.1f}s"
+    print(f"\n  {BOLD('Temps d\\'exécution total :')} {GREEN(time_str)}")
+    print(f"{BOLD('═' * (W + 2))}\n")
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Interactive launcher pour la pipeline d'entity resolution."
@@ -470,7 +547,24 @@ def main() -> None:
             return
 
         print()
-        raise SystemExit(subprocess.call(command, cwd=str(REPO_ROOT)))
+        t_start = time.time()
+        ret = subprocess.call(command, cwd=str(REPO_ROOT))
+        elapsed = time.time() - t_start
+
+        runs_step4 = action in ("pipeline", "member4")
+        if runs_step4 and ret == 0:
+            use_mock = "--mock" in command
+            dataset  = _extract_dataset_from_command(command)
+            datasets = (
+                [d["key"] for d in _load_datasets()]
+                if dataset is None
+                else [dataset]
+            )
+            all_metrics = {ds: _compute_evaluation(ds, use_mock) for ds in datasets}
+            if any(m for m in all_metrics.values()):
+                _print_evaluation_block(all_metrics, elapsed)
+
+        raise SystemExit(ret)
     except PromptAborted as exc:
         print(f"\n{YELLOW('[INFO]')} {exc}")
         raise SystemExit(1)

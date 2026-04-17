@@ -737,12 +737,6 @@ def _finalize_matching_outputs(
 			f"[MATCH] Progress: processed_rows={processed_rows:,}/{total_rows:,}"
 			f"  completed={completed}"
 		)
-	if progressive_stages and not final_df.empty:
-		_print_progressive_evaluation(final_df, truth_path, progressive_stages)
-	result = evaluate(final_df, truth_path)
-	if result:
-		precision, recall, f1_score = result
-		print(f"Precision: {precision:.3f}, Recall: {recall:.3f}, F1: {f1_score:.3f}")
 	return final_df
 	
 ##### ÉTAPE 7 — Orchestration
