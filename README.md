@@ -29,7 +29,7 @@ Cette logique est implémentée principalement dans `pipeline/constraint_witness
 
 ## Architecture
 
-Le workflow suit toujours 4 étapes:
+Le workflow suit 4 étapes principales, complétées par un baseline externe :
 
 1. `Member 1`
    ingestion, normalisation, token blocking
@@ -39,6 +39,8 @@ Le workflow suit toujours 4 étapes:
    matching multi-vues (`jaccard`, `tfidf`, `sbert`) + reranking contextuel monotone
 4. `Member 4`
    clustering par connected components + fusion d'attributs
+5. `Member 5`
+   baseline pyJedAI (pipeline standard : StandardBlocking → BlockPurging → BlockFiltering → WeightedEdgePruning → EntityMatching → UniqueMappingClustering)
 
 ## Modules principaux
 
@@ -54,8 +56,12 @@ Le workflow suit toujours 4 étapes:
   scoring, matching incrémental, reprise, cache d'embeddings
 - `pipeline/clustering.py`
   clustering final et fusion d'entités
+- `pipeline/adaptive_rescue.py`
+  couche post-reranking activée sur les surfaces ambiguës
 - `pipeline/progress.py`
   barres de progression terminales
+- `pipeline/extra_datasets.json`
+  configuration des datasets supplémentaires
 
 ## Entrypoints
 
@@ -73,10 +79,12 @@ Le workflow suit toujours 4 étapes:
   launcher interactif
 - `cli/integrate_dataset.py`
   aide à l'intégration de nouveaux datasets tabulaires
+- `cli/execution_pyjedai.py`
+  baseline pyJedAI (Member 5)
 
 ## Datasets
 
-Datasets principaux déjà intégrés:
+Datasets principaux déjà intégrés (données présentes dans `data/raw/`) :
 
 - `abt_buy`
 - `amazon_google`
@@ -84,7 +92,10 @@ Datasets principaux déjà intégrés:
 - `dblp_scholar`
 - `dbpedia_imdb`
 - `walmart_amazon`
-- `rexa_dblp`
+
+Dataset supporté par le pipeline custom uniquement (données non incluses) :
+
+- `rexa_dblp` — nécessite un téléchargement externe (sources RDF/OAEI)
 
 Espaces de données:
 
@@ -185,6 +196,24 @@ Le matching supporte:
 ./venv/bin/python cli/run_member4.py --dataset amazon_google
 ```
 
+### Member 5 — Baseline pyJedAI
+
+```bash
+./venv/bin/python cli/execution_pyjedai.py --dataset abt_buy
+./venv/bin/python cli/execution_pyjedai.py --dataset amazon_google
+./venv/bin/python cli/execution_pyjedai.py --dataset dblp_acm
+./venv/bin/python cli/execution_pyjedai.py --dataset dblp_scholar
+./venv/bin/python cli/execution_pyjedai.py --dataset dbpedia_imdb
+./venv/bin/python cli/execution_pyjedai.py --dataset walmart_amazon
+./venv/bin/python cli/execution_pyjedai.py --dataset all
+```
+
+Sorties produites dans `output/<dataset>/` :
+- `pyjedai_candidate_pairs.csv`
+- `pyjedai_match_results.csv`
+- `pyjedai_clusters.csv`
+- `pyjedai_metrics.json`
+
 ### Pipeline avec reprise à partir de Step 3
 
 ```bash
@@ -219,7 +248,19 @@ Si Step 3 est partielle, Step 4 est sautée automatiquement.
 python3 -m pytest tests/ -v
 python3 -m pytest tests/test_block_processing.py tests/test_constraint_witness.py -q
 python3 -m pytest tests/test_matching.py -v
+python3 -m pytest tests/test_clustering.py -v
+python3 -m pytest tests/test_data_ingestion.py tests/test_ingestion_paths.py tests/test_mock_paths.py -v
 ```
+
+Fichiers de test disponibles :
+
+- `tests/test_block_processing.py`
+- `tests/test_constraint_witness.py`
+- `tests/test_matching.py`
+- `tests/test_clustering.py`
+- `tests/test_data_ingestion.py`
+- `tests/test_ingestion_paths.py`
+- `tests/test_mock_paths.py`
 
 ## Variables d'environnement utiles
 
@@ -244,12 +285,6 @@ export REXA_DBLP_DIR=/chemin/vers/Rexa-DBLP
   vérification du moteur witness-first
 - `tests/test_matching.py`
   vérification du matching
-- `tasks/novel_er_design.md`
-  note de design
-- `tasks/todo.md`
-  historique de travail
-- `tasks/lessons.md`
-  mémoire technique du projet
 
 ## Limites actuelles
 
@@ -266,8 +301,3 @@ Les prochaines étapes naturelles sont:
 3. pousser les longs runs de Member 3 sur davantage de benchmarks
 4. décider si une couche embedding CPU-first plus forte doit être ajoutée au-dessus du résidu symbolique
 
-## Documentation complémentaire
-
-- [README_block_processing.md](/home/noureddine/paris_cite/Big%20Data/Entity-Resolution-Pipeline/README_block_processing.md)
-- [README_matching.md](/home/noureddine/paris_cite/Big%20Data/Entity-Resolution-Pipeline/README_matching.md)
-- [README_pipeline_modes.md](/home/noureddine/paris_cite/Big%20Data/Entity-Resolution-Pipeline/README_pipeline_modes.md)

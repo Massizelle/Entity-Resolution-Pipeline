@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import io
+import json
 import os
 import shlex
 import subprocess
@@ -412,11 +413,14 @@ def _compute_evaluation(dataset: str, use_mock: bool) -> dict:
         import pandas as pd
         from pipeline.matching import evaluate
 
-        root = os.path.join("output", "mock") if use_mock else "output"
-        match_path = os.path.join(root, dataset, "match_results_collective.csv")
-        gt_path    = os.path.join("data", "cleaned", dataset, "ground_truth.csv")
+        root          = os.path.join("output", "mock") if use_mock else "output"
+        clean_dir     = os.path.join("data", "cleaned", dataset)
+        match_path    = os.path.join(root, dataset, "match_results_collective.csv")
+        gt_path       = os.path.join(clean_dir, "ground_truth.csv")
         clusters_path = os.path.join(root, dataset, "clusters.csv")
         merged_path   = os.path.join(root, dataset, "merged_entities.csv")
+        src1_path     = os.path.join(clean_dir, "cleaned_source1.csv")
+        src2_path     = os.path.join(clean_dir, "cleaned_source2.csv")
 
         metrics: dict = {}
 
@@ -432,9 +436,45 @@ def _compute_evaluation(dataset: str, use_mock: bool) -> dict:
             if result:
                 metrics["precision"], metrics["recall"], metrics["f1"] = result
 
+        # Ratio de Réduction = 1 - (paires évaluées / total paires possibles)
+        # "paires évaluées" = candidate_pairs.csv (paires soumises au matching)
+        candidates_path = os.path.join(root, dataset, "candidate_pairs.csv")
+        if os.path.isfile(candidates_path):
+            n_evaluated = len(pd.read_csv(candidates_path, usecols=[0]))
+            metrics["n_evaluated"] = n_evaluated
+            if os.path.isfile(src1_path) and os.path.isfile(src2_path):
+                n1 = len(pd.read_csv(src1_path, usecols=[0]))
+                n2 = len(pd.read_csv(src2_path, usecols=[0]))
+                total_possible = n1 * n2
+                metrics["n1"] = n1
+                metrics["n2"] = n2
+                metrics["total_possible"] = total_possible
+                metrics["reduction_ratio"] = 1.0 - (n_evaluated / total_possible) if total_possible > 0 else 0.0
+
         return metrics
     except Exception as exc:
         return {"error": str(exc)}
+
+
+def _save_metrics_json(dataset: str, metrics: dict, elapsed: float, use_mock: bool) -> None:
+    """Sauvegarde les métriques finales dans output/<dataset>/pipeline_metrics.json."""
+    root = os.path.join("output", "mock") if use_mock else "output"
+    out_dir = os.path.join(root, dataset)
+    os.makedirs(out_dir, exist_ok=True)
+    data = {
+        "dataset":          dataset,
+        "precision":        round(metrics["precision"], 4) if "precision" in metrics else None,
+        "recall":           round(metrics["recall"],    4) if "recall"    in metrics else None,
+        "f1":               round(metrics["f1"],        4) if "f1"        in metrics else None,
+        "reduction_ratio":  round(metrics["reduction_ratio"], 4) if "reduction_ratio" in metrics else None,
+        "n_evaluated":      metrics.get("n_evaluated"),
+        "total_possible":   metrics.get("total_possible"),
+        "execution_time_s": round(elapsed, 2),
+    }
+    path = os.path.join(out_dir, "pipeline_metrics.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    print(f"  Métriques sauvegardées : {path}")
 
 
 def _print_evaluation_block(all_metrics: dict[str, dict], elapsed: float) -> None:
@@ -451,24 +491,34 @@ def _print_evaluation_block(all_metrics: dict[str, dict], elapsed: float) -> Non
 
         if "error" in m:
             print(f"  {YELLOW('Évaluation indisponible — ' + m['error'])}")
-        elif "precision" in m:
-            p_str = f"{m['precision']:.4f}"
-            r_str = f"{m['recall']:.4f}"
-            f_str = f"{m['f1']:.4f}"
-            print(f"\n  {BOLD('Métriques (ground truth) :')}")
-            print(f"    {'Précision':<22} " + GREEN(p_str))
-            print(f"    {'Rappel':<22} " + GREEN(r_str))
-            print(f"    {'F1-score':<22} " + GREEN(f_str))
+            continue
+
+        # ── Métriques de qualité (ground truth) ──────────────────────────────
+        if "precision" in m:
+            print(f"\n  {BOLD('Qualité (ground truth) :')}")
+            print(f"    {'Précision':<28} " + GREEN(f"{m['precision']:.4f}"))
+            print(f"    {'Rappel':<28} " + GREEN(f"{m['recall']:.4f}"))
+            print(f"    {'F1-score':<28} " + GREEN(f"{m['f1']:.4f}"))
         else:
             print(f"  {DIM('Pas de ground truth disponible (ex: spimbench).')}")
 
+        # ── Ratio de réduction ────────────────────────────────────────────────
+        if "reduction_ratio" in m:
+            print(f"\n  {BOLD('Réduction :')}")
+            print(f"    {'Ratio de Réduction':<28} " + GREEN(f"{m['reduction_ratio']:.4f}"))
+            print(f"    {'Paires évaluées':<28} {m['n_evaluated']:,}")
+            print(f"    {'Paires possibles':<28} {m['total_possible']:,}  "
+                  + DIM(f"({m['n1']:,} × {m['n2']:,})"))
+
+        # ── Clustering ────────────────────────────────────────────────────────
         if "n_clusters" in m or "n_merged" in m:
             print(f"\n  {BOLD('Clustering :')}")
             if "n_clusters" in m:
-                print(f"    {'Clusters':<22} {m['n_clusters']:,}")
+                print(f"    {'Clusters':<28} {m['n_clusters']:,}")
             if "n_merged" in m:
-                print(f"    {'Entités fusionnées':<22} {m['n_merged']:,}")
+                print(f"    {'Entités fusionnées':<28} {m['n_merged']:,}")
 
+    # ── Temps total ───────────────────────────────────────────────────────────
     minutes = int(elapsed // 60)
     seconds = elapsed % 60
     time_str = f"{minutes}m {seconds:.1f}s" if minutes > 0 else f"{seconds:.1f}s"
@@ -566,6 +616,9 @@ def main() -> None:
             all_metrics = {ds: _compute_evaluation(ds, use_mock) for ds in datasets}
             if any(m for m in all_metrics.values()):
                 _print_evaluation_block(all_metrics, elapsed)
+                for ds, m in all_metrics.items():
+                    if m and "error" not in m:
+                        _save_metrics_json(ds, m, elapsed, use_mock)
 
         raise SystemExit(ret)
     except PromptAborted as exc:
