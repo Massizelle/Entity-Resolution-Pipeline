@@ -1,0 +1,18 @@
+{
+  "dbpedia_imdb": {
+    "raw_dir": "/home/noureddine/paris_cite/Big Data/Entity-Resolution-Pipeline/data/raw/DBpedia-IMDb",
+    "source1": "dbpedia",
+    "source2": "imdb",
+    "data_type": "Auto-detected (tabular)",
+    "truth_col_s1": "idDbpedia",
+    "truth_col_s2": "idImdb"
+  },
+  "walmart_amazon": {
+    "raw_dir": "/home/noureddine/paris_cite/Big Data/Entity-Resolution-Pipeline/data/raw/Walmart-Amazon-pyjedai",
+    "source1": "walmart",
+    "source2": "amazon",
+    "data_type": "Auto-detected (tabular)",
+    "truth_col_s1": "idWalmart",
+    "truth_col_s2": "idAmazon"
+  }
+}

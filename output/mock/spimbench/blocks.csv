@@ -1,9 +1,0 @@
-block_id,entity_id,source
-kubrick,spim_a_001,spimbench_a
-kubrick,spim_b_001,spimbench_b
-director,spim_a_001,spimbench_a
-director,spim_b_002,spimbench_b
-london,spim_a_002,spimbench_a
-london,spim_b_003,spimbench_b
-formula1,spim_a_003,spimbench_a
-formula1,spim_b_004,spimbench_b

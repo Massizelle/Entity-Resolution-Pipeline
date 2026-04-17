@@ -1,7 +1,0 @@
-id_A,id_B,similarity_score,is_match
-abt_001,buy_001,0.82,1
-abt_001,buy_002,0.17,0
-abt_002,buy_001,0.12,0
-abt_002,buy_002,0.69,1
-abt_003,buy_003,0.87,1
-abt_003,buy_004,0.09,0
