@@ -1,0 +1,10 @@
+{
+  "dataset": "amazon_google",
+  "precision": 0.584,
+  "recall": 0.5615,
+  "f1": 0.5725,
+  "reduction_ratio": 0.9967,
+  "n_evaluated": 14436,
+  "total_possible": 4397038,
+  "execution_time_s": 99.6
+}

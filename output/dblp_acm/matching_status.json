@@ -1,0 +1,15 @@
+{
+  "dataset": "dblp_acm",
+  "candidate_strategy": "cw_semantic_predictive",
+  "limit": null,
+  "time_limit_seconds": null,
+  "resume": true,
+  "chunk_size": 250,
+  "online_clustering": false,
+  "clustering_algorithm": null,
+  "online_cluster_every_n_chunks": null,
+  "processed_rows": 11183,
+  "total_rows": 11183,
+  "completed": true,
+  "cache_dir": "output/dblp_acm/_matching_cache/cw_semantic_predictive/full"
+}

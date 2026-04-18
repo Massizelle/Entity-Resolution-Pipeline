@@ -21,6 +21,10 @@ from pathlib import Path
 
 import pandas as pd
 
+# pandas 2.1+ removed applymap (renamed to map) — patch for pyjedai compatibility
+if not hasattr(pd.DataFrame, "applymap"):
+    pd.DataFrame.applymap = pd.DataFrame.map
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -332,14 +336,19 @@ def run_pyjedai(name: str) -> None:
     if has_gt:
         try:
             result = ccc.evaluate(clusters)
-        except Exception:
+        except Exception as e:
+            print(f"  [WARN] ccc.evaluate a échoué : {e}")
             result = None
         if isinstance(result, (tuple, list)) and len(result) >= 3:
             precision, recall, f1 = float(result[0]), float(result[1]), float(result[2])
         elif isinstance(result, dict):
-            precision = result.get("precision") or result.get("Precision")
-            recall    = result.get("recall")    or result.get("Recall")
-            f1        = result.get("f1")        or result.get("F1")
+            p = result.get("Precision %") or result.get("precision") or result.get("Precision")
+            r = result.get("Recall %")    or result.get("recall")    or result.get("Recall")
+            f = result.get("F1 %")        or result.get("f1")        or result.get("F1")
+            if p is not None:
+                precision = float(p) / 100
+                recall    = float(r) / 100
+                f1        = float(f) / 100
 
     _print_metrics(name, precision, recall, f1, reduction_ratio, n_evaluated,
                    total_pairs_possible, elapsed)

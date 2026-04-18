@@ -1,0 +1,17 @@
+{
+  "next_index": 11183,
+  "processed_rows": 11183,
+  "completed": true,
+  "metadata": {
+    "pairs_path": "output/dblp_acm/candidate_pairs.csv",
+    "pairs_mtime": 1776455244.3912623,
+    "pairs_size": 1233965,
+    "source1_path": "data/cleaned/dblp_acm/cleaned_source1.csv",
+    "source1_mtime": 1776455156.9775572,
+    "source2_path": "data/cleaned/dblp_acm/cleaned_source2.csv",
+    "source2_mtime": 1776455156.9815571,
+    "candidate_strategy": "cw_semantic_predictive",
+    "limit": null,
+    "partial_score_schema_version": 2
+  }
+}

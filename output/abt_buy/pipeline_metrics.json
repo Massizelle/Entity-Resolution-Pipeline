@@ -1,0 +1,10 @@
+{
+  "dataset": "abt_buy",
+  "precision": 0.7312,
+  "recall": 0.7812,
+  "f1": 0.7554,
+  "reduction_ratio": 0.9951,
+  "n_evaluated": 5733,
+  "total_possible": 1180452,
+  "execution_time_s": 57.24
+}
